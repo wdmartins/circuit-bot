@@ -48,11 +48,6 @@ var client = new Circuit.Client({
 var Robot = function() {
     var self = this;
     var conversation = null;
-    //var command = commander.getInstance();
-
-    this.helloWorld = function() {
-        logger.info('[ROBOT]: Hello World!')
-    };
 
     //*********************************************************************
     //* logonBot
@@ -175,8 +170,5 @@ var Robot = function() {
 var robot = new Robot();
 
 //robot.logonBot().then(robot.sayHi).catch(robot.terminate);
-var str = "hello<hr/>bye<hr/>see you tomorrow";
-//logger.info("Substr: ", str.split('<hr/>').pop());
-//Circuit.supportedEvents.forEach(e => logger.info(e));
 robot.processCommand("Hola como va?");
     
