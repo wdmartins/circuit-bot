@@ -1,0 +1,22 @@
+{
+    "exampleWithSubMenu": {
+        "description": "Displays the status of the device",
+        "submenu": {
+            "test1": {
+                "command": "test1"
+            }
+        }
+    },
+    "help": {
+        "description": "Displays the available commands",
+        "command": "help"
+    },
+    "status": {
+        "description": "Displays the status of the device",
+        "command": "status"
+    },
+    "version": {
+        "description": "Displays the device's software version",
+        "command": "version"
+    }
+}

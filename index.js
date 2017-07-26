@@ -3,6 +3,8 @@
 // Load configuration
 var config = require('./config.json');
 
+var packjson = require('./package.json');
+
 // Logger
 var bunyan = require('bunyan');
 
@@ -48,6 +50,35 @@ var client = new Circuit.Client({
 var Robot = function() {
     var self = this;
     var conversation = null;
+
+    //*********************************************************************
+    //* initBot
+    //*********************************************************************
+    this.initBot = function() {
+        logger.info('[ROBOT]: initialize robot');
+        if (config.eventsFolder) {
+            //Create events folder if it does not exist
+            return new Promise(function (resolve, reject) {
+                fs.stat(config.eventsFolder, function(error, stats) {
+                    if (error) {
+                        if (error.code === 'ENOENT') {
+                            logger.warn('[ROBOT]: Folder ' + config.eventsFolder + ' does not exist. It will be created.');
+                            fs.mkdirSync(config.eventsFolder);
+                            resolve();
+                        } else {
+                            logger.error('[ROBOT] Unable to access folder ' + config.eventsFolder + ' error: ' + error);
+                            reject();
+                            return;
+                        }
+                    } else {
+                        resolve();
+                    }
+                })
+            })
+        } else {
+            logger.error('[ROBOT] Events folder configuration missing in config.json. Set eventsFolder.');
+        }
+    }
 
     //*********************************************************************
     //* logonBot
@@ -106,7 +137,7 @@ var Robot = function() {
         .then(conv => {
             logger.info('[ROBOT]: send conversation item');
             conversation = conv;
-            return client.addTextItem(conv.convId, "Hi Master from " + config.bot.nick_name);
+            return client.addTextItem(conversation.convId, "Hi Master from " + config.bot.nick_name);
         });
     };
 
@@ -144,7 +175,7 @@ var Robot = function() {
     this.processItemAddedEvent = function(evt) {
         if (evt.item.text) {
             logger.info("[ROBOT] Recieved itemAdded event with: ", evt.item.text.content);
-            
+            self.processCommand(evt.item.text.content);
         }
     }
 
@@ -153,15 +184,57 @@ var Robot = function() {
     //*********************************************************************
     this.processItemUpdatedEvent = function(evt) {
         if (evt.item.text) {
-            logger.info("[ROBOT] Recieved itemUpdated event with: ", evt.item.text.content.split('<hr/>').pop());
+            if (evt.item.text.content) {
+                var lastPart = evt.item.text.content.split('<hr/>').pop();
+                logger.info("[ROBOT] Recieved itemUpdated event with: ", lastPart);
+                self.processCommand(lastPart);
+            }
         }
     }
 
-    this.processCommand = function (command) {
-        commander.processCommand(command, function(reply) {
-            logger.info("[ROBOT] Got Reply: ", reply);
-        });
+    //*********************************************************************
+    //* isItForMe?
+    //*********************************************************************
+    this.isItForMe = function (command) {
+        return (command.split(' ').shift().toLowerCase() === config.bot.nick_name.toLowerCase());
     }
+
+    //*********************************************************************
+    //* processCommand
+    //*********************************************************************
+    this.processCommand = function (command) {
+        logger.info("[ROBOT] Processing command: [" + command + "]");
+        if (self.isItForMe(command)) {
+            var withoutName = command.substr(command.indexOf(' ') + 1);
+            logger.info("[ROBOT] Command is for me. Processing [" + withoutName + "]");
+            commander.processCommand(withoutName , function(reply) {
+                logger.info("[ROBOT] Got Reply: ", reply);
+                switch(reply) {
+                    case 'status':
+                        self.reportStatus();
+                        break;
+                    case 'version':
+                        self.reportVersion();
+                        break;
+                    default:
+                        logger.info("[ROBOT] I do not understand [" + withoutName + "]");
+                        client.addTextItem(conversation.convId, "I do not understand [" + withoutName + "]");
+                        break;
+                }
+            });
+        } else {
+            logger.info("[ROBOT] Ignoring command: it is not for me");
+        }
+    }
+
+    this.reportStatus = function() {
+        client.addTextItem(conversation.convId, "Status: On");
+    }
+
+    this.reportVersion = function() {
+        client.addTextItem(conversation.convId, "Version: " + packjson.version);
+    }
+
 }
 
 //*********************************************************************
@@ -170,5 +243,4 @@ var Robot = function() {
 var robot = new Robot();
 
 //robot.logonBot().then(robot.sayHi).catch(robot.terminate);
-robot.processCommand("Hola como va?");
-    
+robot.initBot();
