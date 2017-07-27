@@ -9,7 +9,10 @@ var packjson = require('./package.json');
 var bunyan = require('bunyan');
 
 // Command Processing
-var commander = require('./commandProcess.js');
+var Commander = require('./commandProcess.js');
+
+// Event Manager
+var EventManager = require('./eventsManager.js');
 
 // SDK logger
 var sdkLogger = bunyan.createLogger({
@@ -50,15 +53,17 @@ var client = new Circuit.Client({
 var Robot = function() {
     var self = this;
     var conversation = null;
+    var commander = new Commander(logger);
+    var eventsManager = new EventManager(logger);
 
     //*********************************************************************
     //* initBot
     //*********************************************************************
     this.initBot = function() {
         logger.info('[ROBOT]: initialize robot');
-        if (config.eventsFolder) {
-            //Create events folder if it does not exist
-            return new Promise(function (resolve, reject) {
+        //Create events folder if it does not exist
+        return new Promise(function (resolve, reject) {
+            if (config.eventsFolder) {
                 fs.stat(config.eventsFolder, function(error, stats) {
                     if (error) {
                         if (error.code === 'ENOENT') {
@@ -74,10 +79,11 @@ var Robot = function() {
                         resolve();
                     }
                 })
-            })
-        } else {
-            logger.error('[ROBOT] Events folder configuration missing in config.json. Set eventsFolder.');
-        }
+            } else {
+                logger.error('[ROBOT] Events folder configuration missing in config.json. Set eventsFolder.');
+                reject();
+            }
+        })
     }
 
     //*********************************************************************
@@ -122,7 +128,7 @@ var Robot = function() {
                     resolve(conv);
                 } else {
                     logger.info('[ROBOT]: conversation does not exist, create new conversation');
-                    return client1.createDirectConversation(config.botOwnerEmail);
+                    return client.createDirectConversation(config.botOwnerEmail);
                 }
             })
         });
@@ -235,6 +241,18 @@ var Robot = function() {
         client.addTextItem(conversation.convId, "Version: " + packjson.version);
     }
 
+    this.processRobotEvents = function(event) {
+        logger.info('[ROBOT] New robot event');
+    }
+
+    this.registerForEventsAndReport = function() {
+        logger.info('[ROBOT] Register for Robot Events and Report Current Events');
+        return new Promise(function (resolve, reject) {
+            eventsManager.initEventManager(config.eventsFolder)
+                .then(eventsManager.addNewEventListener(self.processRobotEvents))
+                .then(resolve);
+        });
+    }
 }
 
 //*********************************************************************
@@ -242,5 +260,11 @@ var Robot = function() {
 //*********************************************************************
 var robot = new Robot();
 
-//robot.logonBot().then(robot.sayHi).catch(robot.terminate);
-robot.initBot();
+//robot.registerForEventsAndReport();
+robot.initBot()
+    .then(robot.logonBot)
+    .then(robot.sayHi)
+    .then(robot.registerForEventsAndReport)
+    .catch(robot.terminate);
+//robot.initBot();
+

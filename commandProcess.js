@@ -1,20 +1,9 @@
 'use strict';
-//var commander = require('commander');
-// Logger
-var bunyan = require('bunyan');
-
-// Application logger
-var logger = bunyan.createLogger({
-    name: 'app',
-    stream: process.stdout,
-    level: 'info'
-});
 var menu = require('./menu.json');
 
-
-var commandProcessor;
-var CommandProcessor = function() {
+var CommandProcessor = function(log) {
     var self = this;
+    var logger = log;
 
     this.processCommand = function(command, cb) {
         var commArray = command.split(' ');
@@ -37,14 +26,6 @@ var CommandProcessor = function() {
     }
 }
 
-function getInstance() {
-    if (!commandProcessor) {
-        commandProcessor = new CommandProcessor();
-    }
-    return commandProcessor;
-}
+module.exports = CommandProcessor;
 
-exports.processCommand = function(command, cb) {
-    getInstance().processCommand(command, function(reply) {cb(reply)});
-}
 
