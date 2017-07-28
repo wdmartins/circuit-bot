@@ -1,8 +1,8 @@
 'use strict';
 
 var Event = function(name, time) {
-    var eventName;
-    var eventTime;
+    var eventName = name;
+    var eventTime = time;
 
     this.getName = function() {
         return eventName;

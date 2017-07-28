@@ -5,6 +5,7 @@ var fs = require('fs');
 const path = require('path');
 
 var EventManager = function (log) {
+    var self = this;
     var logger = log;
     var eventsPath;
     var listeners = [];
@@ -13,45 +14,60 @@ var EventManager = function (log) {
 
     logger.info('[EVENTMANAGER] Instantiated');
 
-    this.initEventManager = function(location) {
-        logger.info('[EVENTMANAGER]: Event manager on path: ', location);
-        eventsPath = location;
-        watcher = chokidar.watch(eventsPath, {
-            ignored: /[\/\\]\./, persistent: true
-        });
+    this.initEventManager = function(location, cb) {
         return new Promise(function (resolve,reject) {
-            logger.info('[TEST]: About to readdir at ' + eventsPath);
+            logger.info(`[EVENTMANAGER]: Event manager initialization on ${location}`);
+            eventsPath = location;
+            watcher = chokidar.watch(eventsPath, {
+                ignored: /[\/\\]\./, 
+                persistent: true, 
+                ignoreInitial: true, 
+                alwaysStat: true
+            });
+            // Add watch for new files        
+            watcher.on('add', self.processNewFile);
+            // Get existing events
             fs.readdir(eventsPath, function(error, files) {
-                logger.info('[TEST]: There are ' + files.length + ' files in ' + eventsPath);
+                logger.info(`[TEST] readdir callback with ${files.length} files`);
                 if (error) {
-                    logger.error('[EVENTMANAGER]: Unable to read events from [' + eventsPath + ']');
+                    logger.error(`[EVENTMANAGER]: Unable to read events from ${eventsPath}`);
                     reject();
                 } else {
                     files.forEach(function(file, index) {
-                        logger.info('[TEST] About to stat ' + file);
                         fs.stat(path.join(eventsPath, file), function(error, stat) {
                             if (!error && stat.isFile()) {
-                                logger.info('[TEST] Adding new event with name: ' + file + ' and time ' + stat.ctime);
-                                events.push(new Event(file, stat.birthtimeMs));
+                                logger.info(`[EVENTMANAGER] Adding new event with name ${file} and time ${stat.ctime}`);
+                                events.push(new Event(path.basename(file), stat.ctime));
                             }
-                            logger.info('[TEST] ' + file + ' stated');
+                            if (index === files.length - 1) {
+                                resolve();
+                            }
                         })
                     });
-                    resolve();
                 }
             });
         });
     }
 
-    this.addNewEventListener = function(listener) {
-        listeners.push(listener);
-        logger.info('[EVENTMANAGER]: New watcher added. Total watchers: ' + listeners.length);
-        watcher.on('add', function(filename, stats) {
-            logger.info('[EVENTMANAGER]: Adding new event with name: ' + filename + ' and time ' + (stats ? stats.ctime : 'unknown'));
-            listeners.forEach(function(ltnr) {
-                ltnr(filename, stats);
+    this.processNewFile = function(filename, stats) {
+        logger.info(`[EVENTMANAGER]: New File with name ${filename} and time ${stats.ctime}`);
+        if (listeners) {
+            listeners.forEach(function(lstnr) {
+                lstnr(new Event(path.basename(filename), stats.ctime));
             })
-        })
+        }
+    } 
+
+    this.addNewEventListener = function(listener) {
+        return new Promise(function(resolve, reject) {
+            logger.info(`[EVENTMANAGER]: Add new listener`);
+            listeners.push(listener);
+            resolve();
+        });
+    }
+
+    this.getAllEvents = function() {
+        return events;
     }
 }
 

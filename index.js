@@ -60,18 +60,18 @@ var Robot = function() {
     //* initBot
     //*********************************************************************
     this.initBot = function() {
-        logger.info('[ROBOT]: initialize robot');
+        logger.info(`[ROBOT]: initialize robot`);
         //Create events folder if it does not exist
         return new Promise(function (resolve, reject) {
             if (config.eventsFolder) {
                 fs.stat(config.eventsFolder, function(error, stats) {
                     if (error) {
                         if (error.code === 'ENOENT') {
-                            logger.warn('[ROBOT]: Folder ' + config.eventsFolder + ' does not exist. It will be created.');
+                            logger.warn(`[ROBOT]: Folder ${config.eventsFolder} does not exist. It will be created.`);
                             fs.mkdirSync(config.eventsFolder);
                             resolve();
                         } else {
-                            logger.error('[ROBOT] Unable to access folder ' + config.eventsFolder + ' error: ' + error);
+                            logger.error(`[ROBOT] Unable to access folder ${config.eventsFolder}. Error: ${error}`);
                             reject();
                             return;
                         }
@@ -80,7 +80,7 @@ var Robot = function() {
                     }
                 })
             } else {
-                logger.error('[ROBOT] Events folder configuration missing in config.json. Set eventsFolder.');
+                logger.error(`[ROBOT] Events folder configuration missing in config.json. Set eventsFolder.`);
                 reject();
             }
         })
@@ -90,11 +90,11 @@ var Robot = function() {
     //* logonBot
     //*********************************************************************
     this.logonBot = function() {
-        logger.info('[ROBOT]: Create robot instance with id: ' + config.bot.client_id);
+        logger.info(`[ROBOT]: Create robot instance with id: ${config.bot.client_id}`);
         return new Promise(function (resolve, reject) {
             self.addEventListeners(client);  // register evt listeners
             client.logon();
-            logger.info('[ROBOT]: Client created');
+            logger.info(`[ROBOT]: Client created`);
             setTimeout(resolve, 5000);
         });
     };
@@ -103,7 +103,7 @@ var Robot = function() {
     //* addEventListeners
     //*********************************************************************
     this.addEventListeners = function(client) {
-        logger.info('[ROBOT]: addEventListeners');
+        logger.info(`[ROBOT]: addEventListeners`);
         Circuit.supportedEvents.forEach(e => client.addEventListener(e, self.processEvent));
     };
 
@@ -111,8 +111,8 @@ var Robot = function() {
     //* logEvent -- helper
     //*********************************************************************
     this.logEvent = function(evt) {
-        logger.info('[ROBOT]: ${evt.type} event received');
-        logger.debug('[ROBOT]:', util.inspect(evt, { showHidden: true, depth: null }));
+        logger.info(`[ROBOT]: ${evt.type} event received`);
+        logger.debug(`[ROBOT]:`, util.inspect(evt, { showHidden: true, depth: null }));
     };
 
     //*********************************************************************
@@ -122,12 +122,12 @@ var Robot = function() {
         return new Promise(function (resolve, reject) {
             client.getDirectConversationWithUser(config.botOwnerEmail)
             .then(conv => {
-                logger.info('[ROBOT]: checkIfConversationExists');
+                logger.info(`[ROBOT]: checkIfConversationExists`);
                 if(conv) {
-                    logger.info('[ROBOT]: conversation exists', conv.convId);
+                    logger.info(`[ROBOT]: conversation ${conv.convId} exists`);
                     resolve(conv);
                 } else {
-                    logger.info('[ROBOT]: conversation does not exist, create new conversation');
+                    logger.info(`[ROBOT]: conversation does not exist, create new conversation`);
                     return client.createDirectConversation(config.botOwnerEmail);
                 }
             })
@@ -138,21 +138,34 @@ var Robot = function() {
     //* say Hi
     //*********************************************************************
     this.sayHi = function(evt) {
-        logger.info('[ROBOT]: say hi to master');
+        logger.info(`[ROBOT]: say hi`);
         self.getDirectConversationWithOwner()
         .then(conv => {
-            logger.info('[ROBOT]: send conversation item');
+            logger.info(`[ROBOT]: send conversation item`);
             conversation = conv;
-            return client.addTextItem(conversation.convId, "Hi Master from " + config.bot.nick_name);
+            return self.buildConversationItem(null, `Hi from ${config.bot.nick_name}`, 
+                `Currently there are ${eventsManager.getAllEvents().length} events`).
+                then(item => client.addTextItem(conversation.convId, item));
         });
     };
 
+    this.buildConversationItem = function(parentId, subject, content) {
+        return new Promise(function(resolve, reject) {
+            var item = {
+                parentId: parentId,
+                subject: subject,
+                content: content,
+                contentType: Circuit.Constants.TextItemContentType.RICH
+            };
+            resolve(item);
+        })
+    } 
     //*********************************************************************
     //* terminate -- helper
     //*********************************************************************
     this.terminate = function(err) {
         var error = new Error(err);
-        logger.error('[ROBOT]: Robot failed ' + error.message);
+        logger.error(`[ROBOT]: Robot failed ${error.message}`);
         logger.error(error.stack);
         process.exit(1);
     };
@@ -170,7 +183,7 @@ var Robot = function() {
                 self.processItemUpdatedEvent(evt);
                 break;
             default:
-                logger.info('[ROBOT]: unhandled event ' + evt.type);
+                logger.info(`[ROBOT]: unhandled event ${evt.type}`);
                 break;
         }
     }
@@ -180,8 +193,8 @@ var Robot = function() {
     //*********************************************************************
     this.processItemAddedEvent = function(evt) {
         if (evt.item.text) {
-            logger.info("[ROBOT] Recieved itemAdded event with: ", evt.item.text.content);
-            self.processCommand(evt.item.text.content);
+            logger.info(`[ROBOT] Recieved itemAdded event with itemId [${evt.item.itemId}] and content [${evt.item.text.content}]`);
+            self.processCommand(evt.item.parentItemId || evt.item.itemId, evt.item.text.content);
         }
     }
 
@@ -192,8 +205,8 @@ var Robot = function() {
         if (evt.item.text) {
             if (evt.item.text.content) {
                 var lastPart = evt.item.text.content.split('<hr/>').pop();
-                logger.info("[ROBOT] Recieved itemUpdated event with: ", lastPart);
-                self.processCommand(lastPart);
+                logger.info(`[ROBOT] Recieved itemUpdated event with: ${lastPart}`);
+                self.processCommand(evt.item.parentItemId || evt.item.itemId, lastPart);
             }
         }
     }
@@ -208,50 +221,60 @@ var Robot = function() {
     //*********************************************************************
     //* processCommand
     //*********************************************************************
-    this.processCommand = function (command) {
-        logger.info("[ROBOT] Processing command: [" + command + "]");
+    this.processCommand = function (itemId, command) {
+        logger.info(`[ROBOT] Processing command: [${command}]`);
         if (self.isItForMe(command)) {
             var withoutName = command.substr(command.indexOf(' ') + 1);
-            logger.info("[ROBOT] Command is for me. Processing [" + withoutName + "]");
+            logger.info(`[ROBOT] Command is for me. Processing [${withoutName}]`);
             commander.processCommand(withoutName , function(reply) {
-                logger.info("[ROBOT] Got Reply: ", reply);
+                logger.info(`[ROBOT] Interpreting command tp ${reply}`);
                 switch(reply) {
                     case 'status':
-                        self.reportStatus();
+                        self.reportStatus(itemId);
                         break;
                     case 'version':
-                        self.reportVersion();
+                        self.reportVersion(itemId);
                         break;
                     default:
-                        logger.info("[ROBOT] I do not understand [" + withoutName + "]");
-                        client.addTextItem(conversation.convId, "I do not understand [" + withoutName + "]");
+                        logger.info(`[ROBOT] I do not understand [${withoutName}]`);
+                        self.buildConversationItem(itemId, null, 
+                            `I do not understand <b>[${withoutName}]</b>`).
+                            then(item => client.addTextItem(conversation.convId, item));                        
                         break;
                 }
             });
         } else {
-            logger.info("[ROBOT] Ignoring command: it is not for me");
+            logger.info(`[ROBOT] Ignoring command: it is not for me`);
         }
     }
 
-    this.reportStatus = function() {
-        client.addTextItem(conversation.convId, "Status: On");
+    this.reportStatus = function(itemId) {
+        self.buildConversationItem(itemId, null, 
+            `Status <b>On</b>`).
+            then(item => client.addTextItem(conversation.convId, item));                        
     }
 
-    this.reportVersion = function() {
-        client.addTextItem(conversation.convId, "Version: " + packjson.version);
+    this.reportVersion = function(itemId) {
+        self.buildConversationItem(itemId, null, 
+            `Version: <b>${packjson.version}</b>`).
+            then(item => client.addTextItem(conversation.convId, item));                        
     }
 
     this.processRobotEvents = function(event) {
-        logger.info('[ROBOT] New robot event');
+        logger.info(`[ROBOT] New robot event with name: ${event.getName()} and time ${event.getTimeInSeconds()}`);
     }
 
     this.registerForEventsAndReport = function() {
-        logger.info('[ROBOT] Register for Robot Events and Report Current Events');
+        logger.info(`[ROBOT] Register for Robot Events and Report Current Events`);
         return new Promise(function (resolve, reject) {
-            eventsManager.initEventManager(config.eventsFolder)
+            eventsManager.initEventManager(config.eventsFolder, self.test)
                 .then(eventsManager.addNewEventListener(self.processRobotEvents))
                 .then(resolve);
         });
+    }
+
+    this.test = function() {
+        logger.info(`[TEST]: Currently there are ${eventsManager.getAllEvents().length} events`);
     }
 }
 
@@ -260,11 +283,10 @@ var Robot = function() {
 //*********************************************************************
 var robot = new Robot();
 
-//robot.registerForEventsAndReport();
 robot.initBot()
     .then(robot.logonBot)
-    .then(robot.sayHi)
     .then(robot.registerForEventsAndReport)
+//    .then(robot.test)
+    .then(robot.sayHi)
     .catch(robot.terminate);
-//robot.initBot();
 
