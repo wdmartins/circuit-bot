@@ -41,9 +41,11 @@ var EventManager = function (log) {
                             }
                             if (index === files.length - 1) {
                                 resolve();
+                                return;
                             }
                         })
                     });
+                    resolve();
                 }
             });
         });
