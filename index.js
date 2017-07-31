@@ -138,24 +138,29 @@ var Robot = function() {
     //* say Hi
     //*********************************************************************
     this.sayHi = function(evt) {
-        logger.info(`[ROBOT]: say hi`);
-        self.getDirectConversationWithOwner()
-        .then(conv => {
-            logger.info(`[ROBOT]: send conversation item`);
-            conversation = conv;
-            return self.buildConversationItem(null, `Hi from ${config.bot.nick_name}`, 
-                `Currently there are ${eventsManager.getAllEvents().length} events`).
-                then(item => client.addTextItem(conversation.convId, item));
+        return new Promise(function(resolve, reject) {
+            logger.info(`[ROBOT]: say hi`);
+            self.getDirectConversationWithOwner()
+            .then(conv => {
+                logger.info(`[ROBOT]: send conversation item`);
+                conversation = conv;
+                resolve();
+                return self.buildConversationItem(null, `Hi from ${config.bot.nick_name}`, 
+                    `Currently there are ${eventsManager.getAllEvents().length} events`).
+                    then(item => client.addTextItem(conversation.convId, item));
+            });
         });
     };
 
-    this.buildConversationItem = function(parentId, subject, content) {
+    this.buildConversationItem = function(parentId, subject, content, attachments) {
         return new Promise(function(resolve, reject) {
+            var attach = attachments && [attachments];
             var item = {
                 parentId: parentId,
                 subject: subject,
                 content: content,
-                contentType: Circuit.Constants.TextItemContentType.RICH
+                contentType: Circuit.Constants.TextItemContentType.RICH,
+                attachments: attach
             };
             resolve(item);
         })
@@ -215,7 +220,7 @@ var Robot = function() {
     //* isItForMe?
     //*********************************************************************
     this.isItForMe = function (command) {
-        return (command.split(' ').shift().toLowerCase() === config.bot.nick_name.toLowerCase());
+        return (command.split(' ').shift().toLowerCase() === '@' + config.bot.nick_name.toLowerCase());
     }
 
     //*********************************************************************
@@ -226,14 +231,23 @@ var Robot = function() {
         if (self.isItForMe(command)) {
             var withoutName = command.substr(command.indexOf(' ') + 1);
             logger.info(`[ROBOT] Command is for me. Processing [${withoutName}]`);
-            commander.processCommand(withoutName , function(reply) {
-                logger.info(`[ROBOT] Interpreting command tp ${reply}`);
+            commander.processCommand(withoutName , function(reply, params) {
+                logger.info(`[ROBOT] Interpreting command to ${reply} with parms ${JSON.stringify(params)}`);
                 switch(reply) {
                     case 'status':
                         self.reportStatus(itemId);
                         break;
                     case 'version':
                         self.reportVersion(itemId);
+                        break;
+                    case 'listEvent':
+                        self.listEvents(itemId);
+                        break;
+                    case 'showEvent':
+                        self.showEvent(itemId, params);
+                        break;
+                    case 'showHelp':
+                        self.showHelp(itemId);
                         break;
                     default:
                         logger.info(`[ROBOT] I do not understand [${withoutName}]`);
@@ -273,8 +287,36 @@ var Robot = function() {
         });
     }
 
-    this.test = function() {
-        logger.info(`[TEST]: Currently there are ${eventsManager.getAllEvents().length} events`);
+    this.listEvents = function (itemId) {
+        logger.info(`[ROBOT] Listing all events`);
+        var events = eventsManager.getAllEvents();
+        var eventsList = '';
+        events.forEach(function(event, index) {
+            eventsList += `Event <b>#${index}</b> Time <b>${event.getTimeInSeconds()}</b> </br>`;
+        });
+        self.buildConversationItem(itemId, 'List of events', eventsList)
+            .then(item => client.addTextItem(conversation.convId, item));
+    }
+
+    this.showEvent = function (itemId, eventNumber) {
+        var index = parseInt(eventNumber);
+        logger.info(`[ROBOT]: Show event number ${index}`);
+        if (!index || index > eventsManager.getAllEvents().length - 1) {
+            logger.info(`[ROBOT]: Event request does not exist`);
+            self.buildConversationItem(itemId, null, `The requested event with event number ${eventNumber} does not exist.`)
+                .then(item => client.addTextItem(conversation.convId, item));
+        } else {
+            var filename = eventsManager.getEventFile(index);
+            self.buildConversationItem(itemId, `Here is requested event number ${index}`, null, filename)
+                .then(item => client.addTextItem(conversation.convId, item));
+        }
+
+    }
+
+    this.showHelp = function (itemId) {
+        logger.info(`[ROBOT] Displaying help...`);
+        commander.buildHelp().then(help => self.buildConversationItem(itemId, 'HELP', help)
+            .then(item => client.addTextItem(conversation.convId, item)));
     }
 }
 
@@ -282,11 +324,9 @@ var Robot = function() {
 //* main
 //*********************************************************************
 var robot = new Robot();
-
 robot.initBot()
     .then(robot.logonBot)
     .then(robot.registerForEventsAndReport)
-//    .then(robot.test)
     .then(robot.sayHi)
     .catch(robot.terminate);
 

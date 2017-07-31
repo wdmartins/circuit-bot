@@ -1,6 +1,8 @@
 'use strict';
 var chokidar = require('chokidar');
 var Event = require('./event.js');
+var FileAPI = require('file-api');
+var File = FileAPI.File;
 var fs = require('fs');
 const path = require('path');
 
@@ -33,6 +35,10 @@ var EventManager = function (log) {
                     logger.error(`[EVENTMANAGER]: Unable to read events from ${eventsPath}`);
                     reject();
                 } else {
+                    if (!files.length) {
+                        resolve();
+                        return;
+                    }
                     files.forEach(function(file, index) {
                         fs.stat(path.join(eventsPath, file), function(error, stat) {
                             if (!error && stat.isFile()) {
@@ -45,7 +51,6 @@ var EventManager = function (log) {
                             }
                         })
                     });
-                    resolve();
                 }
             });
         });
@@ -70,6 +75,15 @@ var EventManager = function (log) {
 
     this.getAllEvents = function() {
         return events;
+    }
+
+    this.getEventFile = function(index) {
+        if (index > events.length - 1) {
+            return;
+        }
+        var filename = path.join(eventsPath, events[index].getName());
+        logger.info(`[EVENTMANAGER]: getEventFileName returns ${filename}`)
+        return new File(filename);
     }
 }
 
