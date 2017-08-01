@@ -276,6 +276,9 @@ var Robot = function() {
 
     this.processRobotEvents = function(event) {
         logger.info(`[ROBOT] New robot event with name: ${event.getName()} and time ${event.getTimeInSeconds()}`);
+        self.buildConversationItem(null, "New Event", 
+            `There is a new event. Use events show ${eventsManager.getAllEvents().length-1} to display it.`)
+            .then(item => client.addTextItem(conversation.convId, item));
     }
 
     this.registerForEventsAndReport = function() {

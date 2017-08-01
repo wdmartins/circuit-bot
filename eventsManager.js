@@ -60,7 +60,9 @@ var EventManager = function (log) {
         logger.info(`[EVENTMANAGER]: New File with name ${filename} and time ${stats.ctime}`);
         if (listeners) {
             listeners.forEach(function(lstnr) {
-                lstnr(new Event(path.basename(filename), stats.ctime));
+                var event = new Event(path.basename(filename), stats.ctime);
+                events.push(event);
+                lstnr(event);
             })
         }
     } 
