@@ -60,28 +60,9 @@ var Robot = function() {
     this.initBot = function() {
         logger.info(`[ROBOT]: initialize robot`);
         return new Promise(function (resolve, reject) {
-            if (config.eventsFolder) {
-                //Create events folder if it does not exist
-                fs.stat(config.eventsFolder, function(error, stats) {
-                    if (error) {
-                        if (error.code === 'ENOENT') {
-                            logger.warn(`[ROBOT]: Folder ${config.eventsFolder} does not exist. It will be created.`);
-                            fs.mkdirSync(config.eventsFolder);
-                            resolve();
-                        } else {
-                            logger.error(`[ROBOT] Unable to access folder ${config.eventsFolder}. Error: ${error}`);
-                            reject();
-                            return;
-                        }
-                    } else {
-                        resolve();
-                    }
-                })
-            } else {
-                logger.error(`[ROBOT] Events folder configuration missing in config.json. Set eventsFolder.`);
-                reject();
-            }
-        })
+            //Nothing to do for now
+            resolve();
+        });
     };
 
     //*********************************************************************

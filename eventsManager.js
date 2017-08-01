@@ -20,15 +20,15 @@ var EventManager = function (log) {
         return new Promise(function (resolve,reject) {
             logger.info(`[EVENTMANAGER]: Event manager initialization on ${location}`);
             eventsPath = location;
-            watcher = chokidar.watch(eventsPath, {
-                ignored: /[\/\\]\./, 
-                persistent: true, 
-                ignoreInitial: true, 
-                alwaysStat: true
-            });
-            // Add watch for new files        
-            watcher.on('add', self.processNewFile);
-            // Get existing events
+            self.initFileSystem()
+                .then(self.watchFolder)
+                .then(self.collectExistingEvents)
+                .then(resolve);
+        });
+    };
+
+    this.collectExistingEvents = function() {
+        return new Promise(function (resolve, reject) {
             fs.readdir(eventsPath, function(error, files) {
                 logger.info(`[TEST] readdir callback with ${files.length} files`);
                 if (error) {
@@ -54,7 +54,47 @@ var EventManager = function (log) {
                 }
             });
         });
-    }
+    };
+
+    this.watchFolder = function() {
+        return new Promise(function (resolve, reject) {
+            watcher = chokidar.watch(eventsPath, {
+                ignored: /[\/\\]\./, 
+                persistent: true, 
+                ignoreInitial: true, 
+                alwaysStat: true
+            });
+            // Add watch for new files        
+            watcher.on('add', self.processNewFile);
+            resolve();
+        });
+    };
+
+    this.initFileSystem = function() {
+        return new Promise(function (resolve, reject) {
+            if (eventsPath) {
+                //Create events folder if it does not exist
+                fs.stat(eventsPath, function(error, stats) {
+                    if (error) {
+                        if (error.code === 'ENOENT') {
+                            logger.warn(`[EVENTMANAGER]: Folder ${eventsPath} does not exist. It will be created.`);
+                            fs.mkdirSync(eventsPath);
+                            resolve();
+                        } else {
+                            logger.error(`[EVENTMANAGER] Unable to access folder ${eventsPath}. Error: ${error}`);
+                            reject();
+                            return;
+                        }
+                    } else {
+                        resolve();
+                    }
+                })
+            } else {
+                logger.error(`[EVENTMANAGER] Events folder configuration missing in config.json. Set eventsFolder.`);
+                reject();
+            }
+        });
+    };
 
     this.processNewFile = function(filename, stats) {
         logger.info(`[EVENTMANAGER]: New File with name ${filename} and time ${stats.ctime}`);
@@ -65,7 +105,7 @@ var EventManager = function (log) {
                 lstnr(event);
             })
         }
-    } 
+    };
 
     this.addNewEventListener = function(listener) {
         return new Promise(function(resolve, reject) {
@@ -73,11 +113,11 @@ var EventManager = function (log) {
             listeners.push(listener);
             resolve();
         });
-    }
+    };
 
     this.getAllEvents = function() {
         return events;
-    }
+    };
 
     this.getEventFile = function(index) {
         if (index > events.length - 1) {
@@ -86,7 +126,7 @@ var EventManager = function (log) {
         var filename = path.join(eventsPath, events[index].getName());
         logger.info(`[EVENTMANAGER]: getEventFileName returns ${filename}`)
         return new File(filename);
-    }
+    };
 }
 
 module.exports = EventManager;
