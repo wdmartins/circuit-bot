@@ -32,9 +32,7 @@ var logger = bunyan.createLogger({
 var util = require('util');
 var assert = require('assert');
 
-// For file upload tests
-var FileAPI = require('file-api');
-var File = FileAPI.File;
+// File system
 var fs = require('fs');
 
 // Circuit SDK
@@ -61,9 +59,9 @@ var Robot = function() {
     //*********************************************************************
     this.initBot = function() {
         logger.info(`[ROBOT]: initialize robot`);
-        //Create events folder if it does not exist
         return new Promise(function (resolve, reject) {
             if (config.eventsFolder) {
+                //Create events folder if it does not exist
                 fs.stat(config.eventsFolder, function(error, stats) {
                     if (error) {
                         if (error.code === 'ENOENT') {
@@ -84,7 +82,7 @@ var Robot = function() {
                 reject();
             }
         })
-    }
+    };
 
     //*********************************************************************
     //* logonBot
@@ -152,6 +150,9 @@ var Robot = function() {
         });
     };
 
+    //*********************************************************************
+    //* buildConversationItem
+    //*********************************************************************
     this.buildConversationItem = function(parentId, subject, content, attachments) {
         return new Promise(function(resolve, reject) {
             var attach = attachments && [attachments];
@@ -164,7 +165,8 @@ var Robot = function() {
             };
             resolve(item);
         })
-    } 
+    };
+
     //*********************************************************************
     //* terminate -- helper
     //*********************************************************************
@@ -191,7 +193,7 @@ var Robot = function() {
                 logger.info(`[ROBOT]: unhandled event ${evt.type}`);
                 break;
         }
-    }
+    };
 
     //*********************************************************************
     //* processItemAddedEvent
@@ -199,9 +201,9 @@ var Robot = function() {
     this.processItemAddedEvent = function(evt) {
         if (evt.item.text) {
             logger.info(`[ROBOT] Recieved itemAdded event with itemId [${evt.item.itemId}] and content [${evt.item.text.content}]`);
-            self.processCommand(evt.item.parentItemId || evt.item.itemId, evt.item.text.content);
+            self.processCommand(evt.item.convId, evt.item.parentItemId || evt.item.itemId, evt.item.text.content);
         }
-    }
+    };
 
     //*********************************************************************
     //* processItemUpdatedEvent
@@ -214,19 +216,19 @@ var Robot = function() {
                 self.processCommand(evt.item.parentItemId || evt.item.itemId, lastPart);
             }
         }
-    }
+    };
 
     //*********************************************************************
     //* isItForMe?
     //*********************************************************************
     this.isItForMe = function (command) {
         return (command.split(' ').shift().toLowerCase() === '@' + config.bot.nick_name.toLowerCase());
-    }
+    };
 
     //*********************************************************************
     //* processCommand
     //*********************************************************************
-    this.processCommand = function (itemId, command) {
+    this.processCommand = function (convId, itemId, command) {
         logger.info(`[ROBOT] Processing command: [${command}]`);
         if (self.isItForMe(command)) {
             var withoutName = command.substr(command.indexOf(' ') + 1);
@@ -235,62 +237,77 @@ var Robot = function() {
                 logger.info(`[ROBOT] Interpreting command to ${reply} with parms ${JSON.stringify(params)}`);
                 switch(reply) {
                     case 'status':
-                        self.reportStatus(itemId);
+                        self.reportStatus(convId, itemId);
                         break;
                     case 'version':
-                        self.reportVersion(itemId);
+                        self.reportVersion(convId, itemId);
                         break;
                     case 'listEvent':
-                        self.listEvents(itemId);
+                        self.listEvents(convId, itemId);
                         break;
                     case 'showEvent':
-                        self.showEvent(itemId, params);
+                        self.showEvent(convId, itemId, params);
                         break;
                     case 'showHelp':
-                        self.showHelp(itemId);
+                        self.showHelp(convId, itemId);
                         break;
                     default:
                         logger.info(`[ROBOT] I do not understand [${withoutName}]`);
                         self.buildConversationItem(itemId, null, 
                             `I do not understand <b>[${withoutName}]</b>`).
-                            then(item => client.addTextItem(conversation.convId, item));                        
+                            then(item => client.addTextItem(convId || conversation.convId, item));                        
                         break;
                 }
             });
         } else {
             logger.info(`[ROBOT] Ignoring command: it is not for me`);
         }
-    }
+    };
 
-    this.reportStatus = function(itemId) {
+    //*********************************************************************
+    //* reportStatus
+    //*********************************************************************
+    this.reportStatus = function(convId, itemId) {
         self.buildConversationItem(itemId, null, 
             `Status <b>On</b>`).
-            then(item => client.addTextItem(conversation.convId, item));                        
-    }
+            then(item => client.addTextItem(convId || conversation.convId, item));                        
+    };
 
-    this.reportVersion = function(itemId) {
+    //*********************************************************************
+    //* reportVersion
+    //*********************************************************************
+    this.reportVersion = function(convId, itemId) {
         self.buildConversationItem(itemId, null, 
             `Version: <b>${packjson.version}</b>`).
-            then(item => client.addTextItem(conversation.convId, item));                        
-    }
+            then(item => client.addTextItem(convId || conversation.convId, item));                        
+    };
 
+    //*********************************************************************
+    //* processRobotEvents
+    //*********************************************************************
     this.processRobotEvents = function(event) {
         logger.info(`[ROBOT] New robot event with name: ${event.getName()} and time ${event.getTimeInSeconds()}`);
         self.buildConversationItem(null, "New Event", 
             `There is a new event. Use events show ${eventsManager.getAllEvents().length-1} to display it.`)
             .then(item => client.addTextItem(conversation.convId, item));
-    }
+    };
 
+    //*********************************************************************
+    //* registerForEventsAndReport
+    //*********************************************************************
     this.registerForEventsAndReport = function() {
         logger.info(`[ROBOT] Register for Robot Events and Report Current Events`);
         return new Promise(function (resolve, reject) {
-            eventsManager.initEventManager(config.eventsFolder, self.test)
+            eventsManager.initEventManager(config.eventsFolder)
                 .then(eventsManager.addNewEventListener(self.processRobotEvents))
                 .then(resolve);
         });
-    }
+    };
 
-    this.listEvents = function (itemId) {
+    //*********************************************************************
+    //* listEvents
+    //*********************************************************************
+    this.listEvents = function (convId, itemId) {
         logger.info(`[ROBOT] Listing all events`);
         var events = eventsManager.getAllEvents();
         var eventsList = '';
@@ -298,29 +315,35 @@ var Robot = function() {
             eventsList += `Event <b>#${index}</b> Time <b>${event.getTimeInSeconds()}</b> </br>`;
         });
         self.buildConversationItem(itemId, 'List of events', eventsList)
-            .then(item => client.addTextItem(conversation.convId, item));
-    }
+            .then(item => client.addTextItem(convId || conversation.convId, item));
+    };
 
-    this.showEvent = function (itemId, eventNumber) {
+    //*********************************************************************
+    //* showEvents
+    //*********************************************************************
+    this.showEvent = function (convId, itemId, eventNumber) {
         var index = parseInt(eventNumber);
         logger.info(`[ROBOT]: Show event number ${index}`);
         if (!index || index > eventsManager.getAllEvents().length - 1) {
             logger.info(`[ROBOT]: Event request does not exist`);
             self.buildConversationItem(itemId, null, `The requested event with event number ${eventNumber} does not exist.`)
-                .then(item => client.addTextItem(conversation.convId, item));
+                .then(item => client.addTextItem(convId || conversation.convId, item));
         } else {
             var filename = eventsManager.getEventFile(index);
             self.buildConversationItem(itemId, `Here is requested event number ${index}`, null, filename)
-                .then(item => client.addTextItem(conversation.convId, item));
+                .then(item => client.addTextItem(convId || conversation.convId, item));
         }
 
-    }
+    };
 
-    this.showHelp = function (itemId) {
+    //*********************************************************************
+    //* showHelp
+    //*********************************************************************
+    this.showHelp = function (convId, itemId) {
         logger.info(`[ROBOT] Displaying help...`);
         commander.buildHelp().then(help => self.buildConversationItem(itemId, 'HELP', help)
-            .then(item => client.addTextItem(conversation.convId, item)));
-    }
+            .then(item => client.addTextItem(convId || conversation.convId, item)));
+    };
 }
 
 //*********************************************************************

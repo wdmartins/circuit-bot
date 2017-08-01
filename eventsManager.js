@@ -16,7 +16,7 @@ var EventManager = function (log) {
 
     logger.info('[EVENTMANAGER] Instantiated');
 
-    this.initEventManager = function(location, cb) {
+    this.initEventManager = function(location) {
         return new Promise(function (resolve,reject) {
             logger.info(`[EVENTMANAGER]: Event manager initialization on ${location}`);
             eventsPath = location;
