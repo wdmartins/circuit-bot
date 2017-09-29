@@ -279,7 +279,7 @@ var Robot = function() {
     this.registerForEventsAndReport = function() {
         logger.info(`[ROBOT] Register for Robot Events and Report Current Events`);
         return new Promise(function (resolve, reject) {
-            eventsManager.initEventManager(config.eventsFolder)
+            eventsManager.initEventManager(config.eventsFolder, config.eventsType)
                 .then(eventsManager.addNewEventListener(self.processRobotEvents))
                 .then(resolve);
         });
@@ -305,7 +305,7 @@ var Robot = function() {
     this.showEvent = function (convId, itemId, eventNumber) {
         var index = parseInt(eventNumber);
         logger.info(`[ROBOT]: Show event number ${index}`);
-        if (!index || index > eventsManager.getAllEvents().length - 1) {
+        if (index == undefined || index > eventsManager.getAllEvents().length - 1) {
             logger.info(`[ROBOT]: Event request does not exist`);
             self.buildConversationItem(itemId, null, `The requested event with event number ${eventNumber} does not exist.`)
                 .then(item => client.addTextItem(convId || conversation.convId, item));

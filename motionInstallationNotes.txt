@@ -1,0 +1,15 @@
+// Make sure apt-get is up to date.
+sudo apt-get update
+// Install motion
+sudo apt-get install motion
+// Edit motion.conf to setup proper ports for webcontrol (webcontrol_port) and optionally stream_port
+// Also set stream_localhost, webcontrol_localhost to off and security options (username and password) 
+// to access from another device
+sudo vi /etc/motion/motion.conf
+// Set 
+// Start motion
+motion
+// Match the motion's output folder with the eventsPath in the robot's configuration
+
+// If you are using a Raspberry Camera load the V4L2 module to create /dev/video0
+sudo modprobe bcm2835-v4l2

@@ -10,16 +10,18 @@ var EventManager = function (log) {
     var self = this;
     var logger = log;
     var eventsPath;
+    var eventsType = '*.avi';
     var listeners = [];
     var watcher;
     var events = [];
 
     logger.info('[EVENTMANAGER] Instantiated');
 
-    this.initEventManager = function(location) {
+    this.initEventManager = function(location, type) {
         return new Promise(function (resolve,reject) {
-            logger.info(`[EVENTMANAGER]: Event manager initialization on ${location}`);
+            logger.info(`[EVENTMANAGER]: Event manager initialization on ${location} for type ${type}`);
             eventsPath = location;
+            eventsType = type;
             self.initFileSystem()
                 .then(self.watchFolder)
                 .then(self.collectExistingEvents)
@@ -29,21 +31,27 @@ var EventManager = function (log) {
 
     this.collectExistingEvents = function() {
         return new Promise(function (resolve, reject) {
+            logger.info(`[EVENTMANAGER] Reading files ${eventsPath + '*.' + eventsType}`);
             fs.readdir(eventsPath, function(error, files) {
-                logger.info(`[TEST] readdir callback with ${files.length} files`);
+                logger.info(`[TEST] readdir callback with ${files ? files.length : 0} files`);
                 if (error) {
                     logger.error(`[EVENTMANAGER]: Unable to read events from ${eventsPath}`);
                     reject();
                 } else {
-                    if (!files.length) {
+                    if (!files || !files.length) {
                         resolve();
                         return;
                     }
                     files.forEach(function(file, index) {
                         fs.stat(path.join(eventsPath, file), function(error, stat) {
                             if (!error && stat.isFile()) {
-                                logger.info(`[EVENTMANAGER] Adding new event with name ${file} and time ${stat.ctime}`);
-                                events.push(new Event(path.basename(file), stat.ctime));
+                                logger.info(`[EVENTMANAGER] Reading new event with name ${file} and time ${stat.ctime}`);
+                                var tempArray = file.split(".");
+                                logger.info(`${tempArray}`);
+                                if (tempArray && tempArray.length && tempArray[tempArray.length-1] === eventsType) {
+                                    events.push(new Event(path.basename(file), stat.ctime));
+                                    logger.info(`[EVENTMANAGER] Adding new event with name ${file} and time ${stat.ctime}`);
+                                }
                             }
                             if (index === files.length - 1) {
                                 resolve();
@@ -58,7 +66,7 @@ var EventManager = function (log) {
 
     this.watchFolder = function() {
         return new Promise(function (resolve, reject) {
-            watcher = chokidar.watch(eventsPath, {
+            watcher = chokidar.watch(eventsPath + '*.' + eventsType, {
                 ignored: /[\/\\]\./, 
                 persistent: true, 
                 ignoreInitial: true, 
