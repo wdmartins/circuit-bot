@@ -224,6 +224,9 @@ var Robot = function () {
             case 'itemUpdated':
                 self.processItemUpdatedEvent(evt);
                 break;
+            case 'callStatus':
+                self.processCallStatusEvent(evt);
+                break;
             default:
                 logger.info(`[ROBOT]: unhandled event ${evt.type}`);
                 break;
@@ -250,6 +253,16 @@ var Robot = function () {
                 logger.info(`[ROBOT] Recieved itemUpdated event with: ${lastPart}`);
                 self.processCommand(evt.item.parentItemId || evt.item.itemId, lastPart);
             }
+        }
+    };
+
+    //*********************************************************************
+    //* processCallStatusEvent
+    //*********************************************************************
+    this.processCallStatusEvent = function (evt) {
+        logger.info(`[ROBOT]: Received callStatus event with call state ${evt.call.state}`);
+        if (evt.call.state === 'Started') {
+            self.stream(evt.call.convId, `start`);
         }
     };
 

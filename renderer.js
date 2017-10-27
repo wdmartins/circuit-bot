@@ -3,6 +3,7 @@
 // the same time.
 
 const config = require('electron').remote.require('./config.json');
+var timeout;
 
 // Create circuit SDK client instance
 const client = new Circuit.Client(config.bot);
@@ -14,14 +15,18 @@ ipcRenderer.on("stream", function (sender, convId, rtcSessionId, command) {
     if (command === `start`) {
         startStream(convId, rtcSessionId);
         // Ensure call is always up and stream is sent. E.g. bot could have been dropped
-        setInterval(async () => await stream(), 10 * 1000);
+        timeout = setInterval(async () => await startStream(), 10 * 1000);
     } else if (command === `stop`) {
-        stopStream();
+        clearInterval(timeout);
+        stopStream(rtcSessionId);
     }
 });
 
-async function stopStream() {
-    console.log('Stream stop not implemented yet');
+async function stopStream(rtcSessionId) {
+    let call = await client.findCall(rtcSessionId);
+    if (call) {
+        call = await client.leaveConference(call.callId);
+    }
 }
 
 async function startStream(convId, rtcSessionId) {
