@@ -1,14 +1,14 @@
 'use strict';
 
-var Event = function(name, time) {
+var Event = function (name, time) {
     var eventName = name;
     var eventTime = time;
 
-    this.getName = function() {
+    this.getName = function () {
         return eventName;
     }
 
-    this.getTimeInSeconds = function() {
+    this.getTimeInSeconds = function () {
         return eventTime;
     }
 }
