@@ -166,21 +166,35 @@ var Robot = function () {
     };
 
     //*********************************************************************
-    //* getConversationWithOwner
+    //* getConversation
     //*********************************************************************
-    this.getDirectConversationWithOwner = function () {
+    this.getConversation = function () {
         return new Promise(function (resolve, reject) {
-            client.getDirectConversationWithUser(config.botOwnerEmail)
-                .then(conv => {
-                    logger.info(`[ROBOT]: checkIfConversationExists`);
-                    if (conv) {
-                        logger.info(`[ROBOT]: conversation ${conv.convId} exists`);
-                        resolve(conv);
-                    } else {
-                        logger.info(`[ROBOT]: conversation does not exist, create new conversation`);
-                        return client.createDirectConversation(config.botOwnerEmail);
-                    }
-                })
+            if (config.convId) {
+                client.getConversationById(config.convId)
+                    .then(conv => {
+                        logger.info(`[ROBOT]: checkIfConversationExists`);
+                        if (conv) {
+                            logger.info(`[ROBOT]: conversation ${conv.convId} exists`);
+                            resolve(conv);
+                        } else {
+                            logger.info(`[ROBOT]: conversation with id ${conv.convId} does not exist`);
+                            reject(`conversation with id ${conv.convId} does not exist`);
+                        }
+                    });
+            } else {
+                client.getDirectConversationWithUser(config.botOwnerEmail)
+                    .then(conv => {
+                        logger.info(`[ROBOT]: checkIfConversationExists`);
+                        if (conv) {
+                            logger.info(`[ROBOT]: conversation ${conv.convId} exists`);
+                            resolve(conv);
+                        } else {
+                            logger.info(`[ROBOT]: conversation does not exist, create new conversation`);
+                            return client.createDirectConversation(config.botOwnerEmail);
+                        }
+                    });
+            }
         });
     };
 
@@ -190,7 +204,7 @@ var Robot = function () {
     this.sayHi = function (evt) {
         return new Promise(function (resolve, reject) {
             logger.info(`[ROBOT]: say hi`);
-            self.getDirectConversationWithOwner()
+            self.getConversation()
                 .then(conv => {
                     logger.info(`[ROBOT]: send conversation item`);
                     conversation = conv;
@@ -297,7 +311,7 @@ var Robot = function () {
     //* isItForMe?
     //*********************************************************************
     this.isItForMe = function (command) {
-        return(command.indexOf('mention') !== -1 && command.indexOf(user.displayName) !== -1);
+        return (command.indexOf('mention') !== -1 && command.indexOf(user.displayName) !== -1);
     };
 
     //*********************************************************************
