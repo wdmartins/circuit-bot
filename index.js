@@ -145,7 +145,7 @@ var Robot = function () {
             user.jobTitle = config.bot.job_title;
             user.company = config.bot.company;
             logger.info(`[ROBOT]: Update user ${user.userId} data with firstname: ${user.firstName} and lastname: ${user.lastName}`);
-            client.updateUser(user).then(resolve);
+            client.updateUser(user).then(self.setPresence({ state: Circuit.Enums.PresenceState.AVAILABLE })).then(resolve);
         });
     }
 
@@ -155,6 +155,15 @@ var Robot = function () {
     this.addEventListeners = function (client) {
         logger.info(`[ROBOT]: addEventListeners`);
         Circuit.supportedEvents.forEach(e => client.addEventListener(e, self.processEvent));
+    };
+
+    //*********************************************************************
+    //* setPresence
+    //*********************************************************************
+    this.setPresence = function (presence) {
+        return new Promise(function (resolve, reject) {
+            client.setPresence(presence).then(resolve);
+        });
     };
 
     //*********************************************************************
