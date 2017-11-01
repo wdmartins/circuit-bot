@@ -107,6 +107,7 @@ var Robot = function () {
     var conversation = null;
     var commander = new Commander(logger);
     var eventsManager = new EventManager(logger);
+    var user = {};
 
     //*********************************************************************
     //* initBot
@@ -126,11 +127,27 @@ var Robot = function () {
         logger.info(`[ROBOT]: Create robot instance with id: ${config.bot.client_id}`);
         return new Promise(function (resolve, reject) {
             self.addEventListeners(client);  // register evt listeners
-            const user = client.logon();
-            logger.info(`[ROBOT]: Client created and log as ${user.emailAddress}`);
-            setTimeout(resolve, 5000);
+            client.logon().then(logonUser => {
+                logger.info(`[ROBOT]: Client created and logged as ${logonUser.userId}`);
+                user.userId = logonUser.userId;
+                setTimeout(resolve, 5000);
+            });
         });
     };
+
+    //*********************************************************************
+    //* updateUserData
+    //*********************************************************************
+    this.updateUserData = function () {
+        return new Promise(function (resolve, reject) {
+            user.firstName = config.bot.first_name;
+            user.lastName = config.bot.last_name;
+            user.jobTitle = config.bot.job_title;
+            user.company = config.bot.company;
+            logger.info(`[ROBOT]: Update user ${user.userId} data with firstname: ${user.firstName} and lastname: ${user.lastName}`);
+            client.updateUser(user).then(resolve);
+        });
+    }
 
     //*********************************************************************
     //* addEventListeners
@@ -227,6 +244,9 @@ var Robot = function () {
             case 'callStatus':
                 self.processCallStatusEvent(evt);
                 break;
+            case 'userUpdated':
+                self.processUserUpdatedEvent(evt);
+                break;
             default:
                 logger.info(`[ROBOT]: unhandled event ${evt.type}`);
                 break;
@@ -234,10 +254,17 @@ var Robot = function () {
     };
 
     //*********************************************************************
+    //* processUserUpdatedEvent
+    //*********************************************************************
+    this.processUserUpdatedEvent = function (evt) {
+        user = evt.user;
+    };
+
+    //*********************************************************************
     //* processItemAddedEvent
     //*********************************************************************
     this.processItemAddedEvent = function (evt) {
-        if (evt.item.text) {
+        if (evt.item.text && evt.item.creatorId !== user.userId) {
             logger.info(`[ROBOT] Recieved itemAdded event with itemId [${evt.item.itemId}] and content [${evt.item.text.content}]`);
             self.processCommand(evt.item.convId, evt.item.parentItemId || evt.item.itemId, evt.item.text.content);
         }
@@ -247,7 +274,7 @@ var Robot = function () {
     //* processItemUpdatedEvent
     //*********************************************************************
     this.processItemUpdatedEvent = function (evt) {
-        if (evt.item.text) {
+        if (evt.item.text && evt.item.creatorId !== user.userId) {
             if (evt.item.text.content) {
                 var lastPart = evt.item.text.content.split('<hr/>').pop();
                 logger.info(`[ROBOT] Recieved itemUpdated event with: ${lastPart}`);
@@ -270,7 +297,7 @@ var Robot = function () {
     //* isItForMe?
     //*********************************************************************
     this.isItForMe = function (command) {
-        return (command.split(' ').shift().toLowerCase() === '@' + config.bot.nick_name.toLowerCase());
+        return(command.indexOf('mention') !== -1 && command.indexOf(user.displayName) !== -1);
     };
 
     //*********************************************************************
@@ -279,7 +306,7 @@ var Robot = function () {
     this.processCommand = function (convId, itemId, command) {
         logger.info(`[ROBOT] Processing command: [${command}]`);
         if (self.isItForMe(command)) {
-            var withoutName = command.substr(command.indexOf(' ') + 1);
+            var withoutName = command.substr(command.indexOf('</span> ') + 8);
             logger.info(`[ROBOT] Command is for me. Processing [${withoutName}]`);
             commander.processCommand(withoutName, function (reply, params) {
                 logger.info(`[ROBOT] Interpreting command to ${reply} with parms ${JSON.stringify(params)}`);
@@ -417,6 +444,7 @@ var robot = new Robot();
 robot.initBot()
     .then(robot.logonBot)
     .then(robot.registerForEventsAndReport)
+    .then(robot.updateUserData)
     .then(robot.sayHi)
     .catch(robot.terminate);
 
