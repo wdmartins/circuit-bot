@@ -45,20 +45,20 @@ async function startStream(convId, rtcSessionId) {
 
         // Check if the already streaming on the screenshare stream
         if (!call.localMediaType.desktop) {
-            let constraints = { audio: false, video: { width: 1920, height: 1080 } };
+            let constraints = { audio: true, video: { width: 1280, height: 720 } };
             let mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
 
             // For Debugging show on index.html page
-            /*
             let video = document.querySelector('video');
             video.srcObject = mediaStream;
             video.onloadedmetadata = e => video.play();
-            */
 
             // Send stream on Circuit's screenshare stream. Alternatively use setAudioVideoStream
             // for regular video.
-            await client.setScreenshareStream(call.callId, mediaStream);
-            //await client.setAudioVideoStream(call.callId, mediaStream);
+            //await client.setScreenshareStream(call.callId, mediaStream);
+            await client.setAudioVideoStream(call.callId, mediaStream);
+            await sleep(2000);
+            await client.unmute(call.callId);
         }
     } catch (err) {
         console.error(`${err.name}: ${err.message}`);

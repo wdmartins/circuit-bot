@@ -1,0 +1,20 @@
+//Start Circuit Bot
+npm start
+// Start in electron debug mode
+npm run debug
+
+//Start motion
+sudo motion -c /etc/motion/motion.conf
+
+// Raspberry configuration
+sudo raspi-config
+
+// There is a chromiun bug by which the default camera resolution is expected but in the Raspberry PI it will ended up
+// streaming the minimum (16x16)
+// Workaround (one time)
+echo "bcm2835-v4l2" | sudo tee /etc/modules-load.d/bcm2835-v4l2.conf > /dev/null
+echo "options bcm2835-v4l2 gst_v4l2src_is_broken=1" | sudo tee /etc/modprobe.d/bcm2835-v4l2.conf > /dev/null
+// For more info refer to
+https://raspberrypi.stackexchange.com/questions/66320/raspberry-pi-camera
+https://bugs.chromium.org/p/chromium/issues/detail?id=249953 (Please star this issue if not resolve yet)
+https://github.com/raspberrypi/linux/issues/1498

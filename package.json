@@ -11,7 +11,7 @@
     "bunyan": "^1.5.1",
     "chokidar": "^1.7.0",
     "circuit-sdk": "^1.2.1900",
-    "electron": "^1.8.1",
+    "electron": "~1.6.15",
     "commander": "^2.11.0",
     "file-api": "^0.10.4"
   },
