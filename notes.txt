@@ -4,7 +4,7 @@ npm start
 npm run debug
 
 //Start motion
-sudo motion -c /etc/motion/motion.conf
+sudo motion -c ./motion/motion.conf
 
 // Raspberry configuration
 sudo raspi-config
